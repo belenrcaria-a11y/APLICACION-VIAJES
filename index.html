@@ -391,7 +391,7 @@
       </div>
     </section>
 
-    <footer>Donner Turismo · Sistema de gestión de viajes · <strong>V11</strong></footer>
+    <footer>Donner Turismo · Sistema de gestión de viajes · <strong>V12</strong></footer>
   </main>
 </div>
 
@@ -454,7 +454,7 @@
       <label>N.º comprobante<input id="pReceipt" placeholder="Opcional"></label>
     </div>
     <div style="height:12px"></div>
-    <div class="notice" id="paymentBalanceNotice">Seleccioná una cuenta para ver cuánto queda pendiente.</div>
+    <div class="notice" id="paymentBalanceNotice">Seleccioná el gasto que estás pagando para ver el saldo pendiente.</div>
     <div style="height:12px"></div>
     <label>Observaciones<textarea id="pNotes"></textarea></label>
     <div style="height:16px"></div><button class="btn btn-primary" type="submit">Registrar pago</button>
@@ -773,6 +773,75 @@ function saveCost(e){
   if(currentTripId)renderTripDetail();
 }
 
+
+function savePayment(e){
+  e.preventDefault();
+
+  const tripId=pTrip.value;
+  const costId=pCost.value;
+  const cost=db.costs.find(x=>x.id===costId);
+
+  if(!tripId){
+    alert('Seleccioná un viaje.');
+    return;
+  }
+  if(!cost){
+    alert('Seleccioná el gasto o cuenta que estás pagando.');
+    return;
+  }
+
+  const amount=Number(pAmount.value||0);
+  const pendingBefore=costPending(costId);
+
+  if(amount<=0){
+    alert('Ingresá un monto de pago válido.');
+    return;
+  }
+  if(amount>pendingBefore+0.001){
+    alert(`El pago supera el saldo pendiente de ${money(pendingBefore,cost.currency||'ARS')}.`);
+    return;
+  }
+
+  // Rehabilitar el selector antes de limpiar el formulario.
+  pTrip.disabled=false;
+
+  const payment={
+    id:uid(),
+    tripId,
+    costId,
+    date:pDate.value||today(),
+    providerId:pProvider.value||cost.providerId||'',
+    concept:pConcept.value.trim(),
+    method:pMethod.value,
+    currency:cost.currency||'ARS',
+    amount,
+    receipt:pReceipt.value.trim(),
+    notes:pNotes.value.trim(),
+    created:new Date().toISOString()
+  };
+
+  db.payments.push(payment);
+
+  // Guardado inmediato local + sincronización con Google Sheets.
+  persist();
+
+  const pendingAfter=costPending(costId);
+  const paymentCurrency=cost.currency||'ARS';
+
+  e.target.reset();
+  closeModal('paymentModal');
+
+  if(currentTripId){
+    renderTripDetail();
+  }
+
+  alert(
+    `✅ Pago registrado correctamente.\n\n` +
+    `Pago: ${money(amount,paymentCurrency)}\n` +
+    `Saldo pendiente: ${money(pendingAfter,paymentCurrency)}`
+  );
+}
+
 async function fileToUploadPayload(file){
   if(!file.type.startsWith('image/')){
     const dataUrl=await readFileAsDataURL(file);
@@ -1082,7 +1151,7 @@ function fillPaymentCosts(tripId){
 }
 function syncPaymentCost(){
   const c=db.costs.find(x=>x.id===pCost.value);
-  if(!c){paymentBalanceNotice.textContent='Seleccioná una cuenta para ver cuánto queda pendiente.';return}
+  if(!c){paymentBalanceNotice.textContent='Seleccioná el gasto que estás pagando para ver el saldo pendiente.';return}
   pProvider.value=c.providerId||'';
   pCurrency.value=c.currency||'ARS';
   paymentBalanceNotice.innerHTML=`Moneda: <strong>${c.currency==='USD'?'Dólares (USD)':'Pesos (ARS)'}</strong> · Monto previsto: <strong>${money(c.total,c.currency||'ARS')}</strong> · Pagado: <strong>${money(costPaid(c.id),c.currency||'ARS')}</strong> · Pendiente: <strong>${money(costPending(c.id),c.currency||'ARS')}</strong>`;
@@ -1173,7 +1242,7 @@ updateSyncState();renderAll();loadRemote();
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      const reg=await navigator.serviceWorker.register('sw.js?v=11');
+      const reg=await navigator.serviceWorker.register('sw.js?v=12');
       await reg.update();
       let refreshing=false;
       navigator.serviceWorker.addEventListener('controllerchange',()=>{

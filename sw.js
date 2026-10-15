@@ -1,4 +1,4 @@
-const CACHE='donner-v11';
+const CACHE='donner-v12';
 const ASSETS=['./manifest.json','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',event=>{
