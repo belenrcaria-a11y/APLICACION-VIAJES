@@ -421,13 +421,17 @@
       <label>Nombre del gasto<input id="cConcept" required placeholder="Ej. Hotel, estacionamiento, propina chofer, peaje extra..."></label>
       <label>Proveedor / Agente<select id="cProvider"></select></label>
       <label>Moneda<select id="cCurrency"><option value="ARS">Pesos argentinos (ARS)</option><option value="USD">Dólares (USD)</option></select></label>
-      <label>Monto total previsto / acordado<input id="cTotal" type="number" step="0.01" min="0.01" required placeholder="Ej. 2000000"></label>
+      <label>Forma de calcular<select id="cPricingMode">
+        <option value="perPassenger">Por pasajero</option>
+        <option value="total">Total del grupo</option>
+      </select></label>
+      <label id="cAmountLabel">Monto por pasajero<input id="cTotal" type="number" step="0.01" min="0.01" required placeholder="Ej. 30000"></label>
     </div>
     <div style="height:12px"></div>
-    <div class="notice">Este monto representa lo que costará el servicio completo. Después podrás ir registrando pagos parciales hasta completar el saldo.</div>
+    <div class="notice" id="costCalcNotice">Ingresá un monto para ver el costo total del viaje.</div>
     <div style="height:12px"></div>
     <label>Observaciones<textarea id="cNotes"></textarea></label>
-    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar costo</button>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar gasto</button>
   </form>
 </div></div>
 
@@ -522,7 +526,13 @@ const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzrD0_wO5CFsyGt
 let db = JSON.parse(localStorage.getItem('donner_db') || '{"trips":[],"costs":[],"payments":[],"providers":[],"rejectedDollars":[],"receipts":[]}');
 db.rejectedDollars = db.rejectedDollars || [];
 db.receipts = db.receipts || [];
-db.costs = (db.costs||[]).map(c=>({...c,currency:c.currency||'ARS'}));
+db.costs = (db.costs||[]).map(c=>({
+  ...c,
+  currency:c.currency||'ARS',
+  pricingMode:c.pricingMode||'total',
+  unitAmount:Number(c.unitAmount ?? c.unit ?? c.total ?? 0),
+  passengerCount:Number(c.passengerCount || (c.pricingMode==='perPassenger'?c.qty:0) || 0)
+}));
 db.payments = (db.payments||[]).map(p=>({...p,currency:p.currency||'ARS'}));
 let config = JSON.parse(localStorage.getItem('donner_cfg') || JSON.stringify({company:'Donner Turismo',api:DEFAULT_API_URL}));
 if(!config.api){ config.api=DEFAULT_API_URL; localStorage.setItem('donner_cfg',JSON.stringify(config)); }
@@ -608,6 +618,9 @@ function openCostModalForCurrentTrip(){
   fillSelects();
   cTrip.value=currentTripId;
   cTrip.disabled=true;
+  cPricingMode.value='perPassenger';
+  cTotal.value='';
+  updateCostCalculation();
   openModal('costModal');
 }
 function openPaymentModalForCurrentTrip(){
@@ -659,23 +672,74 @@ function receiptCostChanged(){
 function openModal(id){document.getElementById(id).classList.add('open')}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function openTripModal(){openModal('tripModal')}
-function openCostModal(){fillSelects();cTrip.disabled=false;openModal('costModal')}
+function openCostModal(){fillSelects();cTrip.disabled=false;cPricingMode.value='perPassenger';cTotal.value='';updateCostCalculation();openModal('costModal')}
 function openPaymentModal(costId=''){fillSelects();pTrip.disabled=false;document.getElementById('pDate').value=today();if(costId){const c=db.costs.find(x=>x.id===costId);if(c){pTrip.value=c.tripId;fillPaymentCosts(c.tripId);pCost.value=c.id;syncPaymentCost();}}else{fillPaymentCosts(pTrip.value)}openModal('paymentModal')}
 function openProviderModal(){openModal('providerModal')}
 function openRejectedModal(){fillSelects();rTrip.disabled=false;document.getElementById('rDate').value=today();openModal('rejectedModal')}
 
 function saveTrip(e){e.preventDefault();db.trips.push({id:uid(),name:tName.value,destination:tDestination.value,start:tStart.value,end:tEnd.value,passengers:+tPassengers.value,responsible:tResponsible.value,notes:tNotes.value,created:new Date().toISOString()});persist();e.target.reset();closeModal('tripModal')}
-function saveCost(e){e.preventDefault();cTrip.disabled=false;db.costs.push({id:uid(),tripId:cTrip.value,category:cCategory.value,concept:cConcept.value,providerId:cProvider.value,currency:cCurrency.value,qty:1,unit:+cTotal.value,total:+cTotal.value,notes:cNotes.value,created:new Date().toISOString()});persist();e.target.reset();closeModal('costModal');if(currentTripId)renderTripDetail()}
-function savePayment(e){
+
+function getSelectedCostTrip(){
+  return db.trips.find(t=>t.id===cTrip.value) || null;
+}
+function updateCostCalculation(){
+  const trip=getSelectedCostTrip();
+  const mode=cPricingMode.value;
+  const amount=Number(cTotal.value||0);
+  const currency=cCurrency.value||'ARS';
+  const passengers=Number(trip?.passengers||0);
+
+  cAmountLabel.firstChild.textContent = mode==='perPassenger' ? 'Monto por pasajero' : 'Monto total del grupo';
+
+  if(!trip){
+    costCalcNotice.innerHTML='Seleccioná un viaje para calcular el gasto.';
+    return;
+  }
+  if(mode==='perPassenger'){
+    const total=amount*passengers;
+    costCalcNotice.innerHTML=`<strong>${passengers} pasajeros</strong> × <strong>${money(amount,currency)}</strong> = <strong>${money(total,currency)}</strong> de costo total`;
+  }else{
+    costCalcNotice.innerHTML=`Costo total del grupo: <strong>${money(amount,currency)}</strong> · ${passengers} pasajeros`;
+  }
+}
+
+function saveCost(e){
   e.preventDefault();
-  const cost=db.costs.find(x=>x.id===pCost.value);
-  if(!cost)return alert('Seleccioná la cuenta o gasto que estás pagando.');
-  const amount=+pAmount.value;
-  const pending=costPending(cost.id);
-  if(amount<=0)return alert('Ingresá un monto válido.');
-  if(amount>pending+0.001)return alert('El pago supera el saldo pendiente de '+money(pending)+'.');
-  pTrip.disabled=false;db.payments.push({id:uid(),tripId:pTrip.value,costId:pCost.value,date:pDate.value,providerId:pProvider.value,concept:pConcept.value,method:pMethod.value,currency:cost.currency||'ARS',amount,receipt:pReceipt.value,notes:pNotes.value,created:new Date().toISOString()});
-  persist();e.target.reset();closeModal('paymentModal');if(currentTripId)renderTripDetail();
+  const tripId=cTrip.value;
+  const trip=db.trips.find(t=>t.id===tripId);
+  if(!trip)return alert('Seleccioná un viaje.');
+  const pricingMode=cPricingMode.value;
+  const unitAmount=Number(cTotal.value||0);
+  const passengerCount=Number(trip.passengers||0);
+  if(unitAmount<=0)return alert('Ingresá un monto válido.');
+  if(pricingMode==='perPassenger' && passengerCount<=0)return alert('El viaje debe tener una cantidad de pasajeros válida.');
+
+  const qty=pricingMode==='perPassenger'?passengerCount:1;
+  const total=unitAmount*qty;
+  cTrip.disabled=false;
+
+  db.costs.push({
+    id:uid(),
+    tripId,
+    category:cCategory.value,
+    concept:cConcept.value,
+    providerId:cProvider.value,
+    currency:cCurrency.value,
+    pricingMode,
+    passengerCount,
+    unitAmount,
+    qty,
+    unit:unitAmount,
+    total,
+    notes:cNotes.value,
+    created:new Date().toISOString()
+  });
+
+  persist();
+  e.target.reset();
+  cPricingMode.value='perPassenger';
+  closeModal('costModal');
+  if(currentTripId)renderTripDetail();
 }
 
 async function fileToUploadPayload(file){
@@ -785,6 +849,17 @@ function removeItem(kind,id){
 function tripCost(id,currency='ARS'){return db.costs.filter(x=>x.tripId===id&&(x.currency||'ARS')===currency).reduce((a,b)=>a+Number(b.total||0),0)}
 function tripPaid(id,currency='ARS'){return db.payments.filter(x=>x.tripId===id&&(x.currency||'ARS')===currency).reduce((a,b)=>a+Number(b.amount||0),0)}
 function tripPending(id,currency='ARS'){return Math.max(0,tripCost(id,currency)-tripPaid(id,currency))}
+
+function costCalculationText(c){
+  const mode=c.pricingMode||'total';
+  if(mode==='perPassenger'){
+    const passengers=Number(c.passengerCount||c.qty||0);
+    const unit=Number(c.unitAmount ?? c.unit ?? 0);
+    return `${money(unit,c.currency||'ARS')} × ${passengers} pasajeros`;
+  }
+  return 'Total del grupo';
+}
+
 function costPaid(id){return db.payments.filter(x=>x.costId===id).reduce((a,b)=>a+Number(b.amount||0),0)}
 function costPending(id){const c=db.costs.find(x=>x.id===id);return c?Math.max(0,Number(c.total||0)-costPaid(id)):0}
 function costStatus(id){
@@ -826,7 +901,7 @@ function renderTripDetail(){
     const s=costStatus(c.id);
     return `<tr>
       <td><span class="badge b-blue">${esc(c.category)}</span></td>
-      <td>${esc(c.concept)}</td>
+      <td>${esc(c.concept)}<div class="small muted">${esc(costCalculationText(c))}</div></td>
       <td>${esc(providerName(c.providerId))}</td>
       <td>${c.currency||'ARS'}</td>
       <td><strong>${money(c.total,c.currency||'ARS')}</strong></td>
@@ -923,7 +998,7 @@ function renderCosts(){
     return `<tr>
       <td>${esc(tripName(c.tripId))}</td>
       <td><span class="badge b-blue">${esc(c.category)}</span></td>
-      <td>${esc(c.concept)}</td>
+      <td>${esc(c.concept)}<div class="small muted">${esc(costCalculationText(c))}</div></td>
       <td>${esc(providerName(c.providerId))}</td>
       <td><strong>${money(c.total,c.currency||'ARS')}</strong></td>
       <td>${money(costPaid(c.id),c.currency||'ARS')}</td>
@@ -982,6 +1057,10 @@ function syncPaymentCost(){
   paymentBalanceNotice.innerHTML=`Moneda: <strong>${c.currency==='USD'?'Dólares (USD)':'Pesos (ARS)'}</strong> · Monto previsto: <strong>${money(c.total,c.currency||'ARS')}</strong> · Pagado: <strong>${money(costPaid(c.id),c.currency||'ARS')}</strong> · Pendiente: <strong>${money(costPending(c.id),c.currency||'ARS')}</strong>`;
   pAmount.max=costPending(c.id);
 }
+cTrip.addEventListener('change',updateCostCalculation);
+cPricingMode.addEventListener('change',updateCostCalculation);
+cTotal.addEventListener('input',updateCostCalculation);
+cCurrency.addEventListener('change',updateCostCalculation);
 pTrip.addEventListener('change',()=>{fillPaymentCosts(pTrip.value);syncPaymentCost()});
 pCost.addEventListener('change',syncPaymentCost);
 function renderReportSummary(){
@@ -1021,8 +1100,8 @@ function exportPDF(){
   doc.setFontSize(18);doc.text(config.company||'Donner Turismo',14,18);
   doc.setFontSize(13);doc.text('Resumen económico del viaje',14,27);
   doc.setFontSize(10);doc.text(`Viaje: ${t.name}`,14,36);doc.text(`Destino: ${t.destination}`,14,42);doc.text(`Fechas: ${fmtDate(t.start)} al ${fmtDate(t.end)} · Pasajeros: ${t.passengers}`,14,48);
-  const costs=db.costs.filter(x=>x.tripId===id).map(c=>[c.category,c.concept,providerName(c.providerId),c.currency||'ARS',money(c.total,c.currency||'ARS'),money(costPaid(c.id),c.currency||'ARS'),money(costPending(c.id),c.currency||'ARS')]);
-  doc.autoTable({startY:56,head:[['Categoría','Concepto','Proveedor','Moneda','Monto previsto','Pagado','Pendiente']],body:costs,styles:{fontSize:8}});
+  const costs=db.costs.filter(x=>x.tripId===id).map(c=>[c.category,c.concept,costCalculationText(c),providerName(c.providerId),c.currency||'ARS',money(c.total,c.currency||'ARS'),money(costPaid(c.id),c.currency||'ARS'),money(costPending(c.id),c.currency||'ARS')]);
+  doc.autoTable({startY:56,head:[['Categoría','Concepto','Cálculo','Proveedor','Moneda','Monto previsto','Pagado','Pendiente']],body:costs,styles:{fontSize:7.5}});
   let y=doc.lastAutoTable.finalY+8;
   const pays=db.payments.filter(x=>x.tripId===id).map(p=>[fmtDate(p.date),providerName(p.providerId),p.concept,p.method,p.currency||'ARS',money(p.amount,p.currency||'ARS'),p.receipt||'']);
   doc.autoTable({startY:y,head:[['Fecha','Destinatario','Concepto','Medio','Moneda','Monto','Comprobante']],body:pays,styles:{fontSize:8}});
@@ -1043,7 +1122,7 @@ function exportExcel(){
     [],['Dólares rechazados del viaje',(db.rejectedDollars||[]).filter(r=>r.tripId===id).reduce((a,b)=>a+Number(b.amount||0),0)]
   ];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'Resumen');
-  const costs=[['Categoría','Concepto','Proveedor','Moneda','Monto previsto','Pagado','Pendiente','Estado','Observaciones'],...db.costs.filter(x=>x.tripId===id).map(c=>{const s=costStatus(c.id);return [c.category,c.concept,providerName(c.providerId),c.currency||'ARS',c.total,costPaid(c.id),costPending(c.id),s[0],c.notes||'']})];
+  const costs=[['Categoría','Concepto','Forma de cálculo','Monto base','Cantidad pasajeros','Proveedor','Moneda','Monto previsto','Pagado','Pendiente','Estado','Observaciones'],...db.costs.filter(x=>x.tripId===id).map(c=>{const s=costStatus(c.id);return [c.category,c.concept,(c.pricingMode||'total')==='perPassenger'?'Por pasajero':'Total del grupo',Number(c.unitAmount??c.unit??c.total??0),Number(c.passengerCount||0),providerName(c.providerId),c.currency||'ARS',c.total,costPaid(c.id),costPending(c.id),s[0],c.notes||'']})];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(costs),'Costos');
   const pays=[['Fecha','Cuenta / gasto','Destinatario','Concepto del pago','Medio','Moneda','Monto','Comprobante','Observaciones'],...db.payments.filter(x=>x.tripId===id).map(p=>{const c=db.costs.find(x=>x.id===p.costId);return [fmtDate(p.date),c?c.concept:'Pago general',providerName(p.providerId),p.concept,p.method,p.currency||'ARS',p.amount,p.receipt||'',p.notes||'']})];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pays),'Pagos');
