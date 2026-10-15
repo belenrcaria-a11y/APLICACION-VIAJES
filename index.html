@@ -385,12 +385,13 @@
         <div class="actions">
           <button class="btn btn-primary" onclick="saveConfig()">Guardar configuración</button>
           <button class="btn btn-light" onclick="testConnection()">Probar conexión</button>
+          <button class="btn btn-light" onclick="forceAppUpdate()">Actualizar app</button>
         </div>
         <div id="connectionTestResult" class="small muted" style="margin-top:10px"></div>
       </div>
     </section>
 
-    <footer>Donner Turismo · Sistema de gestión de viajes</footer>
+    <footer>Donner Turismo · Sistema de gestión de viajes · <strong>V11</strong></footer>
   </main>
 </div>
 
@@ -425,6 +426,9 @@
         <option value="perPassenger">Por pasajero</option>
         <option value="total">Total del grupo</option>
       </select></label>
+      <label id="cPassengerLabel">Cantidad de pasajeros para este gasto
+        <input id="cPassengers" type="number" min="1" step="1" required placeholder="Ej. 42">
+      </label>
       <label id="cAmountLabel">Monto por pasajero<input id="cTotal" type="number" step="0.01" min="0.01" required placeholder="Ej. 30000"></label>
     </div>
     <div style="height:12px"></div>
@@ -555,6 +559,23 @@ function saveConfig(){
   localStorage.setItem('donner_cfg',JSON.stringify(config));
   updateSyncState(); alert('Configuración guardada.');
 }
+
+async function forceAppUpdate(){
+  const out=document.getElementById('connectionTestResult');
+  out.textContent='Buscando una versión nueva...';
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.update()));
+    }
+    const url=new URL(location.href);
+    url.searchParams.set('v',Date.now());
+    location.replace(url.toString());
+  }catch(e){
+    location.reload();
+  }
+}
+
 async function testConnection(){
   const url=(document.getElementById('cfgApi').value||'').trim();
   const out=document.getElementById('connectionTestResult');
@@ -619,6 +640,8 @@ function openCostModalForCurrentTrip(){
   cTrip.value=currentTripId;
   cTrip.disabled=true;
   cPricingMode.value='perPassenger';
+  const trip=db.trips.find(t=>t.id===currentTripId);
+  cPassengers.value=trip?.passengers||'';
   cTotal.value='';
   updateCostCalculation();
   openModal('costModal');
@@ -672,7 +695,7 @@ function receiptCostChanged(){
 function openModal(id){document.getElementById(id).classList.add('open')}
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 function openTripModal(){openModal('tripModal')}
-function openCostModal(){fillSelects();cTrip.disabled=false;cPricingMode.value='perPassenger';cTotal.value='';updateCostCalculation();openModal('costModal')}
+function openCostModal(){fillSelects();cTrip.disabled=false;cPricingMode.value='perPassenger';cPassengers.value='';cTotal.value='';updateCostCalculation();openModal('costModal')}
 function openPaymentModal(costId=''){fillSelects();pTrip.disabled=false;document.getElementById('pDate').value=today();if(costId){const c=db.costs.find(x=>x.id===costId);if(c){pTrip.value=c.tripId;fillPaymentCosts(c.tripId);pCost.value=c.id;syncPaymentCost();}}else{fillPaymentCosts(pTrip.value)}openModal('paymentModal')}
 function openProviderModal(){openModal('providerModal')}
 function openRejectedModal(){fillSelects();rTrip.disabled=false;document.getElementById('rDate').value=today();openModal('rejectedModal')}
@@ -687,19 +710,26 @@ function updateCostCalculation(){
   const mode=cPricingMode.value;
   const amount=Number(cTotal.value||0);
   const currency=cCurrency.value||'ARS';
-  const passengers=Number(trip?.passengers||0);
+  const passengers=Number(cPassengers.value||0);
 
   cAmountLabel.firstChild.textContent = mode==='perPassenger' ? 'Monto por pasajero' : 'Monto total del grupo';
+  cPassengerLabel.style.display = mode==='perPassenger' ? 'grid' : 'none';
+  cPassengers.required = mode==='perPassenger';
 
   if(!trip){
     costCalcNotice.innerHTML='Seleccioná un viaje para calcular el gasto.';
     return;
   }
+
   if(mode==='perPassenger'){
+    if(passengers<=0){
+      costCalcNotice.innerHTML='Ingresá la <strong>cantidad de pasajeros para este gasto</strong>.';
+      return;
+    }
     const total=amount*passengers;
     costCalcNotice.innerHTML=`<strong>${passengers} pasajeros</strong> × <strong>${money(amount,currency)}</strong> = <strong>${money(total,currency)}</strong> de costo total`;
   }else{
-    costCalcNotice.innerHTML=`Costo total del grupo: <strong>${money(amount,currency)}</strong> · ${passengers} pasajeros`;
+    costCalcNotice.innerHTML=`Costo total del grupo: <strong>${money(amount,currency)}</strong>`;
   }
 }
 
@@ -710,9 +740,9 @@ function saveCost(e){
   if(!trip)return alert('Seleccioná un viaje.');
   const pricingMode=cPricingMode.value;
   const unitAmount=Number(cTotal.value||0);
-  const passengerCount=Number(trip.passengers||0);
+  const passengerCount=pricingMode==='perPassenger'?Number(cPassengers.value||0):0;
   if(unitAmount<=0)return alert('Ingresá un monto válido.');
-  if(pricingMode==='perPassenger' && passengerCount<=0)return alert('El viaje debe tener una cantidad de pasajeros válida.');
+  if(pricingMode==='perPassenger' && passengerCount<=0)return alert('Ingresá la cantidad de pasajeros para este gasto.');
 
   const qty=pricingMode==='perPassenger'?passengerCount:1;
   const total=unitAmount*qty;
@@ -738,6 +768,7 @@ function saveCost(e){
   persist();
   e.target.reset();
   cPricingMode.value='perPassenger';
+  cPassengers.value='';
   closeModal('costModal');
   if(currentTripId)renderTripDetail();
 }
@@ -855,7 +886,7 @@ function costCalculationText(c){
   if(mode==='perPassenger'){
     const passengers=Number(c.passengerCount||c.qty||0);
     const unit=Number(c.unitAmount ?? c.unit ?? 0);
-    return `${money(unit,c.currency||'ARS')} × ${passengers} pasajeros`;
+    return `${passengers} pasajeros × ${money(unit,c.currency||'ARS')}`;
   }
   return 'Total del grupo';
 }
@@ -1057,8 +1088,13 @@ function syncPaymentCost(){
   paymentBalanceNotice.innerHTML=`Moneda: <strong>${c.currency==='USD'?'Dólares (USD)':'Pesos (ARS)'}</strong> · Monto previsto: <strong>${money(c.total,c.currency||'ARS')}</strong> · Pagado: <strong>${money(costPaid(c.id),c.currency||'ARS')}</strong> · Pendiente: <strong>${money(costPending(c.id),c.currency||'ARS')}</strong>`;
   pAmount.max=costPending(c.id);
 }
-cTrip.addEventListener('change',updateCostCalculation);
+cTrip.addEventListener('change',()=>{
+  const trip=getSelectedCostTrip();
+  if(cPricingMode.value==='perPassenger') cPassengers.value=trip?.passengers||'';
+  updateCostCalculation();
+});
 cPricingMode.addEventListener('change',updateCostCalculation);
+cPassengers.addEventListener('input',updateCostCalculation);
 cTotal.addEventListener('input',updateCostCalculation);
 cCurrency.addEventListener('change',updateCostCalculation);
 pTrip.addEventListener('change',()=>{fillPaymentCosts(pTrip.value);syncPaymentCost()});
@@ -1134,7 +1170,20 @@ function renderAll(){renderStats();renderRecent();renderTrips();renderCosts();re
 document.getElementById('cfgCompany').value=config.company||'Donner Turismo';
 document.getElementById('cfgApi').value=config.api||DEFAULT_API_URL;
 updateSyncState();renderAll();loadRemote();
-if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('sw.js?v=11');
+      await reg.update();
+      let refreshing=false;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(refreshing)return;
+        refreshing=true;
+        location.reload();
+      });
+    }catch(e){console.warn('Service worker:',e)}
+  });
+}
 </script>
 </body>
 </html>
