@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0f172a"/>
+  <title>Donner Turismo - Gestión de Viajes</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --text:#172033;
+      --muted:#667085;
+      --primary:#0f766e;
+      --primary2:#14b8a6;
+      --dark:#0f172a;
+      --border:#e5e7eb;
+      --danger:#dc2626;
+      --warning:#d97706;
+      --success:#16a34a;
+      --shadow:0 10px 30px rgba(15,23,42,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    button,input,select,textarea{font:inherit}
+    button{cursor:pointer}
+    .app{min-height:100vh;display:grid;grid-template-columns:260px 1fr}
+    aside{background:linear-gradient(180deg,var(--dark),#13223d);color:white;padding:24px 18px;position:sticky;top:0;height:100vh}
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:26px}
+    .logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--primary2),#2dd4bf);display:grid;place-items:center;font-weight:900;font-size:24px;color:#063b37}
+    .brand h1{font-size:20px;margin:0}.brand small{color:#cbd5e1}
+    nav{display:grid;gap:8px}
+    nav button{border:0;background:transparent;color:#dbe4ee;text-align:left;padding:12px 14px;border-radius:12px}
+    nav button.active,nav button:hover{background:rgba(255,255,255,.1);color:white}
+    main{padding:28px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+    .topbar h2{margin:0;font-size:28px}.topbar p{margin:5px 0 0;color:var(--muted)}
+    .pill{padding:9px 12px;border-radius:999px;background:#ecfdf5;color:#065f46;font-size:13px;font-weight:700}
+    .grid{display:grid;gap:16px}
+    .stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .stat .label{font-size:13px;color:var(--muted);margin-bottom:8px}.stat .value{font-size:27px;font-weight:800}
+    .stat .sub{font-size:12px;color:var(--muted);margin-top:5px}
+    .section{display:none}.section.active{display:block}
+    .section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:22px 0 12px}
+    .section-head h3{margin:0}
+    .btn{border:0;border-radius:12px;padding:10px 14px;font-weight:700}
+    .btn-primary{background:var(--primary);color:white}.btn-light{background:#eef2f7;color:var(--text)}
+    .btn-danger{background:#fee2e2;color:#991b1b}.btn-success{background:#dcfce7;color:#166534}
+    .table-wrap{overflow:auto;border-radius:14px}
+    table{width:100%;border-collapse:collapse;min-width:760px}
+    th,td{padding:12px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
+    th{color:#475569;background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+    tr:hover td{background:#fbfdff}
+    .badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}
+    .b-green{background:#dcfce7;color:#166534}.b-yellow{background:#fef3c7;color:#92400e}.b-red{background:#fee2e2;color:#991b1b}.b-blue{background:#dbeafe;color:#1d4ed8}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    label{font-size:13px;font-weight:700;color:#344054;display:grid;gap:7px}
+    input,select,textarea{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:11px;background:white;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:#14b8a6;box-shadow:0 0 0 3px rgba(20,184,166,.12)}
+    textarea{min-height:92px;resize:vertical}
+    .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .modal.open{display:flex}.modal-card{width:min(760px,100%);max-height:90vh;overflow:auto;background:white;border-radius:20px;padding:20px;box-shadow:0 25px 80px rgba(0,0,0,.25)}
+    .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.modal-head h3{margin:0}.close{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:20px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .split{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+    .summary-box{background:linear-gradient(135deg,#0f766e,#115e59);color:white;border-radius:18px;padding:18px}
+    .summary-box h4{margin:0 0 16px}.sum-row{display:flex;justify-content:space-between;margin:10px 0}.sum-row strong{font-size:17px}
+    .search{max-width:340px}
+    .empty{padding:28px;text-align:center;color:var(--muted)}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .trip-title{font-weight:800}.muted{color:var(--muted)}
+    .small{font-size:12px}
+    .notice{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:12px 14px;border-radius:12px;font-size:13px}
+    footer{color:#94a3b8;text-align:center;font-size:12px;margin:28px 0 10px}
+    @media(max-width:980px){
+      .app{grid-template-columns:1fr}
+      aside{height:auto;position:static;padding:14px}
+      .brand{margin-bottom:12px}
+      nav{display:flex;overflow:auto;gap:6px}
+      nav button{white-space:nowrap}
+      main{padding:16px}
+      .stats{grid-template-columns:repeat(2,1fr)}
+      .split{grid-template-columns:1fr}
+    }
+    @media(max-width:620px){
+      .topbar{align-items:flex-start;flex-direction:column}.topbar h2{font-size:24px}
+      .stats{grid-template-columns:1fr}
+      .form-grid{grid-template-columns:1fr}
+      .section-head{align-items:flex-start;flex-direction:column}
+      .search{max-width:none;width:100%}
+      .btn{padding:11px 13px}
+      .card{padding:14px}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="logo">D</div>
+      <div><h1>Donner</h1><small>Gestión de Turismo</small></div>
+    </div>
+    <nav>
+      <button class="active" data-section="inicio">🏠 Inicio</button>
+      <button data-section="viajes">🚌 Viajes</button>
+      <button data-section="gastos">💰 Gastos</button>
+      <button data-section="pagos">💳 Pagos</button>
+      <button data-section="proveedores">🏨 Proveedores</button>
+      <button data-section="rechazados">💵 Dólares rechazados</button>
+      <button data-section="informes">📊 Informes</button>
+      <button data-section="config">⚙️ Configuración</button>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div><h2 id="pageTitle">Panel general</h2><p id="pageSubtitle">Control económico de todos los viajes.</p></div>
+      <div class="pill" id="syncState">● Modo local</div>
+    </div>
+
+    <section id="inicio" class="section active">
+      <div class="grid stats">
+        <div class="card stat"><div class="label">Viajes registrados</div><div class="value" id="stTrips">0</div><div class="sub">Histórico y activos</div></div>
+        <div class="card stat"><div class="label">Costos cargados</div><div class="value" id="stCosts">$0</div><div class="sub">Total presupuestado</div></div>
+        <div class="card stat"><div class="label">Pagado</div><div class="value" id="stPaid">$0</div><div class="sub">Transferencia + efectivo</div></div>
+        <div class="card stat"><div class="label">Pendiente</div><div class="value" id="stPending">$0</div><div class="sub">Saldo por pagar</div></div>
+      </div>
+
+      <div class="section-head"><h3>Últimos viajes</h3><button class="btn btn-primary" onclick="openTripModal()">+ Nuevo viaje</button></div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Viaje</th><th>Fechas</th><th>Pasajeros</th><th>Costo</th><th>Pagado</th><th>Estado</th></tr></thead><tbody id="recentTrips"></tbody></table></div></div>
+    </section>
+
+    <section id="viajes" class="section">
+      <div class="section-head">
+        <div><h3>Viajes</h3><div class="muted small">Creá un viaje y luego ingresá para administrar todos sus costos y pagos.</div></div>
+        <div class="toolbar"><input id="tripSearch" class="search" placeholder="Buscar destino o nombre..." oninput="renderTrips()"><button class="btn btn-primary" onclick="openTripModal()">+ Nuevo viaje</button></div>
+      </div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Destino</th><th>Salida</th><th>Pasajeros</th><th>Costo total</th><th>Pagado</th><th>Pendiente</th><th></th></tr></thead><tbody id="tripsTable"></tbody></table></div></div>
+    </section>
+
+
+    <section id="detalleViaje" class="section">
+      <div class="section-head">
+        <div>
+          <button class="btn btn-light" type="button" onclick="goToTrips()">← Volver a viajes</button>
+          <h3 id="detailTripTitle" style="margin-top:12px">Detalle del viaje</h3>
+          <div class="muted small" id="detailTripMeta"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="button" onclick="openCostModalForCurrentTrip()">+ Agregar gasto</button>
+          <button class="btn btn-success" type="button" onclick="openPaymentModalForCurrentTrip()">+ Registrar pago</button>
+          <button class="btn btn-light" type="button" onclick="openReceiptModalForCurrentTrip()">📎 Subir comprobante</button>
+          <button class="btn btn-light" type="button" onclick="openRejectedModalForCurrentTrip()">+ Dólar rechazado</button>
+        </div>
+      </div>
+
+      <div class="grid stats" style="margin-bottom:16px">
+        <div class="card stat"><div class="label">Costo total ARS</div><div class="value" id="dtCostARS">$0</div><div class="sub">Monto previsto</div></div>
+        <div class="card stat"><div class="label">Pagado ARS</div><div class="value" id="dtPaidARS">$0</div><div class="sub">Pagos realizados</div></div>
+        <div class="card stat"><div class="label">Costo total USD</div><div class="value" id="dtCostUSD">US$0</div><div class="sub">Monto previsto</div></div>
+        <div class="card stat"><div class="label">Pagado USD</div><div class="value" id="dtPaidUSD">US$0</div><div class="sub">Pagos realizados</div></div>
+      </div>
+
+      <div class="split">
+        <div class="card">
+          <div class="section-head" style="margin-top:0">
+            <div><h3 style="font-size:18px">Costos del viaje</h3><div class="muted small">Cada gasto funciona como una cuenta a pagar.</div></div>
+            <button class="btn btn-primary" type="button" onclick="openCostModalForCurrentTrip()">+ Gasto</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Categoría</th><th>Concepto</th><th>Proveedor</th><th>Moneda</th><th>Previsto</th><th>Pagado</th><th>Pendiente</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="detailCostsTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="summary-box" id="detailSummaryBox">
+          <h4>Resumen económico</h4>
+          <div class="sum-row"><span>Pendiente ARS</span><strong id="dtPendingARS">$0</strong></div>
+          <div class="sum-row"><span>Pendiente USD</span><strong id="dtPendingUSD">US$0</strong></div>
+          <hr style="border:0;border-top:1px solid rgba(255,255,255,.25)">
+          <div class="sum-row"><span>Dólares rechazados</span><strong id="dtRejectedUSD">US$0</strong></div>
+          <div class="sum-row"><span>Pasajeros</span><strong id="dtPassengers">0</strong></div>
+        </div>
+      </div>
+
+      <div class="section-head"><div><h3>Pagos del viaje</h3><div class="muted small">Historial de transferencias, efectivo y otros medios.</div></div></div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Destinatario</th><th>Concepto</th><th>Medio</th><th>Moneda</th><th>Monto</th><th></th></tr></thead><tbody id="detailPaymentsTable"></tbody></table></div></div>
+
+
+      <div class="section-head">
+        <div><h3>Comprobantes del viaje</h3><div class="muted small">Fotos o PDF guardados en Google Drive y vinculados a este viaje.</div></div>
+        <button class="btn btn-primary" type="button" onclick="openReceiptModalForCurrentTrip()">📎 Subir comprobante</button>
+      </div>
+      <div class="card">
+        <div class="notice" style="margin-bottom:12px">Los comprobantes son respaldo documental. Subir una imagen no modifica el saldo: los pagos se registran por separado para evitar duplicaciones.</div>
+        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Gasto</th><th>Detalle</th><th>Destinatario</th><th>Moneda</th><th>Monto</th><th>Archivo</th><th></th></tr></thead><tbody id="detailReceiptsTable"></tbody></table></div>
+      </div>
+
+      <div class="section-head"><div><h3>Dólares rechazados del viaje</h3></div></div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pasajero</th><th>Monto</th><th>Motivo</th><th>Estado</th><th></th></tr></thead><tbody id="detailRejectedTable"></tbody></table></div></div>
+    </section>
+
+    <section id="gastos" class="section">
+      <div class="section-head">
+        <div><h3>Gastos / Costos</h3><div class="muted small">Agregá cualquier gasto escribiendo su nombre, monto y moneda; después registrá pagos parciales.</div></div>
+        <button class="btn btn-primary" onclick="openCostModal()">+ Agregar gasto</button>
+      </div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Viaje</th><th>Categoría</th><th>Concepto</th><th>Proveedor</th><th>Monto previsto</th><th>Pagado</th><th>Pendiente</th><th>Estado</th><th></th></tr></thead><tbody id="costsTable"></tbody></table></div></div>
+    </section>
+
+    <section id="pagos" class="section">
+      <div class="section-head">
+        <div><h3>Pagos realizados</h3><div class="muted small">Control de transferencias, efectivo y saldos.</div></div>
+        <button class="btn btn-primary" onclick="openPaymentModal()">+ Registrar pago</button>
+      </div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Viaje</th><th>Destinatario</th><th>Concepto</th><th>Medio</th><th>Monto</th><th>Comprobante</th><th></th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
+    </section>
+
+    <section id="proveedores" class="section">
+      <div class="section-head">
+        <div><h3>Proveedores y agentes</h3><div class="muted small">Hoteles, choferes, coordinadores, restaurantes, agencias, etc.</div></div>
+        <button class="btn btn-primary" onclick="openProviderModal()">+ Nuevo proveedor</button>
+      </div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Teléfono</th><th>CUIT / DNI</th><th>Observaciones</th><th></th></tr></thead><tbody id="providersTable"></tbody></table></div></div>
+    </section>
+
+
+    <section id="rechazados" class="section">
+      <div class="section-head">
+        <div><h3>Dólares rechazados</h3><div class="muted small">Registro de billetes en dólares que el banco no aceptó.</div></div>
+        <button class="btn btn-primary" onclick="openRejectedModal()">+ Registrar rechazo</button>
+      </div>
+      <div class="grid stats" style="margin-bottom:16px">
+        <div class="card stat"><div class="label">Total rechazado</div><div class="value" id="stRejectedUSD">US$0</div><div class="sub">Histórico registrado</div></div>
+        <div class="card stat"><div class="label">Pendiente de resolver</div><div class="value" id="stRejectedPendingUSD">US$0</div><div class="sub">Billetes aún no reemplazados</div></div>
+      </div>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pasajero</th><th>Viaje</th><th>Monto</th><th>Motivo / Marca</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody id="rejectedTable"></tbody></table></div></div>
+    </section>
+
+    <section id="informes" class="section">
+      <div class="section-head"><div><h3>Informes</h3><div class="muted small">Elegí un viaje y generá el resumen.</div></div></div>
+      <div class="split">
+        <div class="card">
+          <label>Viaje<select id="reportTrip" onchange="renderReportSummary()"></select></label>
+          <div style="height:12px"></div>
+          <div class="notice">El informe separa pesos y dólares e incluye costos, pagos, saldos pendientes, costo por pasajero y dólares rechazados.</div>
+          <div style="height:14px"></div>
+          <div class="actions">
+            <button class="btn btn-primary" onclick="exportPDF()">📄 Descargar PDF</button>
+            <button class="btn btn-success" onclick="exportExcel()">📗 Descargar Excel</button>
+          </div>
+        </div>
+        <div class="summary-box" id="reportSummary"><h4>Resumen del viaje</h4><div class="muted" style="color:#d1fae5">Seleccioná un viaje.</div></div>
+      </div>
+    </section>
+
+    <section id="config" class="section">
+      <div class="section-head"><h3>Configuración</h3></div>
+      <div class="card">
+        <div class="form-grid">
+          <label>Nombre comercial<input id="cfgCompany" value="Donner Turismo"></label>
+          <label>URL de Google Apps Script<input id="cfgApi" value="https://script.google.com/macros/s/AKfycbzrD0_wO5CFsyGts6WrAEAsG4VGBa8a2y7Y-Htt46tndjR3BvwTqrijJGH5fqMqFhcGXA/exec" placeholder="https://script.google.com/macros/s/.../exec"></label>
+        </div>
+        <div style="height:12px"></div>
+        <div class="notice">Sin una URL de Apps Script, la app funciona y guarda los datos en este dispositivo. Con Apps Script configurado, puede sincronizarse entre PC y celular.</div>
+        <div style="height:14px"></div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="saveConfig()">Guardar configuración</button>
+          <button class="btn btn-light" onclick="testConnection()">Probar conexión</button>
+        </div>
+        <div id="connectionTestResult" class="small muted" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <footer>Donner Turismo · Sistema de gestión de viajes</footer>
+  </main>
+</div>
+
+<!-- Modales -->
+<div class="modal" id="tripModal"><div class="modal-card">
+  <div class="modal-head"><h3>Nuevo viaje</h3><button class="close" onclick="closeModal('tripModal')">×</button></div>
+  <form onsubmit="saveTrip(event)">
+    <div class="form-grid">
+      <label>Nombre del viaje<input id="tName" required placeholder="Ej. Cataratas Julio 2027"></label>
+      <label>Destino<input id="tDestination" required placeholder="Ej. Puerto Iguazú"></label>
+      <label>Fecha de salida<input id="tStart" type="date" required></label>
+      <label>Fecha de regreso<input id="tEnd" type="date" required></label>
+      <label>Cantidad de pasajeros<input id="tPassengers" type="number" min="1" value="1" required></label>
+      <label>Responsable<input id="tResponsible" placeholder="Coordinador/a o responsable"></label>
+    </div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="tNotes"></textarea></label>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar viaje</button>
+  </form>
+</div></div>
+
+<div class="modal" id="costModal"><div class="modal-card">
+  <div class="modal-head"><h3>Agregar gasto</h3><button class="close" onclick="closeModal('costModal')">×</button></div>
+  <form onsubmit="saveCost(event)">
+    <div class="form-grid">
+      <label>Viaje<select id="cTrip" required></select></label>
+      <label>Categoría (opcional)<select id="cCategory"><option>Hotel</option><option>Transporte</option><option>Chofer</option><option>Coordinador</option><option>Comidas</option><option>Excursiones</option><option>Entradas</option><option>Seguro</option><option>Peajes</option><option>Combustible</option><option>Personalizado / Otro</option></select></label>
+      <label>Nombre del gasto<input id="cConcept" required placeholder="Ej. Hotel, estacionamiento, propina chofer, peaje extra..."></label>
+      <label>Proveedor / Agente<select id="cProvider"></select></label>
+      <label>Moneda<select id="cCurrency"><option value="ARS">Pesos argentinos (ARS)</option><option value="USD">Dólares (USD)</option></select></label>
+      <label>Monto total previsto / acordado<input id="cTotal" type="number" step="0.01" min="0.01" required placeholder="Ej. 2000000"></label>
+    </div>
+    <div style="height:12px"></div>
+    <div class="notice">Este monto representa lo que costará el servicio completo. Después podrás ir registrando pagos parciales hasta completar el saldo.</div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="cNotes"></textarea></label>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar costo</button>
+  </form>
+</div></div>
+
+<div class="modal" id="paymentModal"><div class="modal-card">
+  <div class="modal-head"><h3>Registrar pago</h3><button class="close" onclick="closeModal('paymentModal')">×</button></div>
+  <form onsubmit="savePayment(event)">
+    <div class="form-grid">
+      <label>Viaje<select id="pTrip" required></select></label>
+      <label>Cuenta / gasto a pagar<select id="pCost" required></select></label>
+      <label>Fecha<input id="pDate" type="date" required></label>
+      <label>Destinatario<select id="pProvider"></select></label>
+      <label>Concepto del pago<input id="pConcept" required placeholder="Ej. Seña / segunda entrega"></label>
+      <label>Medio de pago<select id="pMethod"><option>Transferencia</option><option>Efectivo</option><option>Otro</option></select></label>
+      <label>Moneda<select id="pCurrency" disabled><option value="ARS">Pesos argentinos (ARS)</option><option value="USD">Dólares (USD)</option></select></label>
+      <label>Monto<input id="pAmount" type="number" step="0.01" min="0" required></label>
+      <label>N.º comprobante<input id="pReceipt" placeholder="Opcional"></label>
+    </div>
+    <div style="height:12px"></div>
+    <div class="notice" id="paymentBalanceNotice">Seleccioná una cuenta para ver cuánto queda pendiente.</div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="pNotes"></textarea></label>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Registrar pago</button>
+  </form>
+</div></div>
+
+
+
+<div class="modal" id="receiptModal"><div class="modal-card">
+  <div class="modal-head"><h3>Subir comprobante a Google Drive</h3><button class="close" onclick="closeModal('receiptModal')">×</button></div>
+  <form id="receiptForm" onsubmit="uploadReceipt(event)">
+    <div class="form-grid">
+      <label>Fecha<input id="rcDate" type="date" required></label>
+      <label>Gasto asociado<select id="rcCost" onchange="receiptCostChanged()"></select></label>
+      <label>Detalle de lo que estás pagando<input id="rcDescription" required placeholder="Ej. Segunda entrega hotel / seña chofer"></label>
+      <label>Destinatario<input id="rcRecipient" required placeholder="Hotel, chofer, coordinador, etc."></label>
+      <label>Moneda<select id="rcCurrency"><option value="ARS">Pesos argentinos (ARS)</option><option value="USD">Dólares (USD)</option></select></label>
+      <label>Monto del comprobante<input id="rcAmount" type="number" min="0.01" step="0.01" required></label>
+    </div>
+    <div style="height:12px"></div>
+    <label>Imagen o PDF del comprobante<input id="rcFile" type="file" accept="image/*,application/pdf" required></label>
+    <div class="small muted" style="margin-top:6px">Las imágenes grandes se reducen automáticamente antes de subirlas para facilitar el guardado.</div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="rcNotes" placeholder="Opcional"></textarea></label>
+    <div style="height:12px"></div>
+    <div class="notice" id="receiptUploadStatus">El archivo se guardará en una carpeta de Google Drive de Donner y quedará asociado a este viaje.</div>
+    <div style="height:16px"></div>
+    <button class="btn btn-primary" id="receiptSubmit" type="submit">Subir y guardar comprobante</button>
+  </form>
+</div></div>
+
+<div class="modal" id="rejectedModal"><div class="modal-card">
+  <div class="modal-head"><h3>Registrar dólares rechazados</h3><button class="close" onclick="closeModal('rejectedModal')">×</button></div>
+  <form onsubmit="saveRejected(event)">
+    <div class="form-grid">
+      <label>Fecha<input id="rDate" type="date" required></label>
+      <label>Pasajero<input id="rPassenger" required placeholder="Nombre y apellido"></label>
+      <label>Viaje<select id="rTrip"></select></label>
+      <label>Monto rechazado (USD)<input id="rAmount" type="number" min="0.01" step="0.01" required></label>
+      <label>Motivo / Marca<input id="rReason" required placeholder="Ej. Billete marcado, sello, escritura"></label>
+      <label>Estado<select id="rStatus"><option>Pendiente</option><option>Reemplazado</option><option>Devuelto</option><option>Resuelto</option></select></label>
+    </div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="rNotes" placeholder="Detalle adicional del billete o de la gestión realizada"></textarea></label>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar registro</button>
+  </form>
+</div></div>
+
+<div class="modal" id="providerModal"><div class="modal-card">
+  <div class="modal-head"><h3>Nuevo proveedor / agente</h3><button class="close" onclick="closeModal('providerModal')">×</button></div>
+  <form onsubmit="saveProvider(event)">
+    <div class="form-grid">
+      <label>Nombre<input id="prName" required></label>
+      <label>Tipo<select id="prType"><option>Hotel</option><option>Chofer</option><option>Coordinador</option><option>Empresa de transporte</option><option>Restaurante</option><option>Agencia / Excursión</option><option>Otro</option></select></label>
+      <label>Teléfono<input id="prPhone"></label>
+      <label>CUIT / DNI<input id="prTax"></label>
+    </div>
+    <div style="height:12px"></div>
+    <label>Observaciones<textarea id="prNotes"></textarea></label>
+    <div style="height:16px"></div><button class="btn btn-primary" type="submit">Guardar proveedor</button>
+  </form>
+</div></div>
+
+<script>
+const moneyARS = n => new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:2}).format(Number(n||0));
+const moneyUSD = n => new Intl.NumberFormat('es-AR',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(n||0));
+const money = (n,currency='ARS') => currency==='USD' ? moneyUSD(n) : moneyARS(n);
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const today = () => new Date().toISOString().slice(0,10);
+
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzrD0_wO5CFsyGts6WrAEAsG4VGBa8a2y7Y-Htt46tndjR3BvwTqrijJGH5fqMqFhcGXA/exec';
+
+let db = JSON.parse(localStorage.getItem('donner_db') || '{"trips":[],"costs":[],"payments":[],"providers":[],"rejectedDollars":[],"receipts":[]}');
+db.rejectedDollars = db.rejectedDollars || [];
+db.receipts = db.receipts || [];
+db.costs = (db.costs||[]).map(c=>({...c,currency:c.currency||'ARS'}));
+db.payments = (db.payments||[]).map(p=>({...p,currency:p.currency||'ARS'}));
+let config = JSON.parse(localStorage.getItem('donner_cfg') || JSON.stringify({company:'Donner Turismo',api:DEFAULT_API_URL}));
+if(!config.api){ config.api=DEFAULT_API_URL; localStorage.setItem('donner_cfg',JSON.stringify(config)); }
+let currentTripId = null;
+
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(b.dataset.section).classList.add('active');
+  const titles={detalleViaje:['Detalle del viaje','Costos, pagos y resumen económico del viaje.'],inicio:['Panel general','Control económico de todos los viajes.'],viajes:['Viajes','Administración integral de viajes.'],gastos:['Gastos y costos','Costos previstos y reales por viaje.'],pagos:['Pagos','Transferencias, efectivo y comprobantes.'],proveedores:['Proveedores y agentes','Agenda de hoteles, choferes, coordinadores y otros.'],rechazados:['Dólares rechazados','Control de billetes en USD que el banco no aceptó.'],informes:['Informes','Resúmenes listos para PDF o Excel.'],config:['Configuración','Conexión y datos generales.']};
+  document.getElementById('pageTitle').textContent=titles[b.dataset.section][0];
+  document.getElementById('pageSubtitle').textContent=titles[b.dataset.section][1];
+}));
+
+function persist(){ localStorage.setItem('donner_db',JSON.stringify(db)); renderAll(); if(currentTripId)renderTripDetail(); syncRemote(); }
+function saveConfig(){
+  config.company=document.getElementById('cfgCompany').value.trim()||'Donner Turismo';
+  config.api=document.getElementById('cfgApi').value.trim();
+  localStorage.setItem('donner_cfg',JSON.stringify(config));
+  updateSyncState(); alert('Configuración guardada.');
+}
+async function testConnection(){
+  const url=(document.getElementById('cfgApi').value||'').trim();
+  const out=document.getElementById('connectionTestResult');
+  if(!url){out.textContent='Falta la URL de Apps Script.';return}
+  out.textContent='Probando conexión...';
+  try{
+    const r=await fetch(url);
+    const text=await r.text();
+    let data=null;
+    try{ data=JSON.parse(text); }catch(e){}
+    if(r.ok && data && data.ok){
+      out.textContent='✅ Conexión correcta con Donner API.';
+      config.api=url;
+      localStorage.setItem('donner_cfg',JSON.stringify(config));
+      updateSyncState();
+    }else{
+      out.textContent='⚠️ La URL respondió, pero no como Donner API. Revisá la implementación de Apps Script.';
+    }
+  }catch(err){
+    out.textContent='❌ No se pudo conectar. En Apps Script, revisá que la aplicación web tenga acceso para "Cualquier usuario".';
+  }
+}
+function updateSyncState(){document.getElementById('syncState').textContent=config.api?'● Sincronización configurada':'● Modo local'}
+async function syncRemote(){
+  if(!config.api) return;
+  try{
+    await fetch(config.api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'backup',payload:db})});
+    document.getElementById('syncState').textContent='● Datos sincronizados';
+  }catch(e){document.getElementById('syncState').textContent='● Pendiente de sincronizar'}
+}
+async function loadRemote(){
+  if(!config.api) return;
+  try{
+    const r=await fetch(config.api+'?action=load');
+    const j=await r.json();
+    if(j && j.ok && j.data){db=j.data; localStorage.setItem('donner_db',JSON.stringify(db)); renderAll();}
+  }catch(e){
+    document.getElementById('syncState').textContent='● Sin acceso a Apps Script';
+  }
+}
+
+
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  const target=document.getElementById(id); if(target) target.classList.add('active');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  const navBtn=document.querySelector(`nav button[data-section="${id}"]`);
+  if(navBtn) navBtn.classList.add('active');
+}
+function goToTrips(){showSection('viajes');pageTitle.textContent='Viajes';pageSubtitle.textContent='Administración integral de viajes.'}
+function openTripDetail(id){
+  const t=db.trips.find(x=>x.id===id); if(!t)return;
+  currentTripId=id;
+  showSection('detalleViaje');
+  pageTitle.textContent=t.name;
+  pageSubtitle.textContent='Administración completa de este viaje.';
+  renderTripDetail();
+}
+function openCostModalForCurrentTrip(){
+  if(!currentTripId)return;
+  fillSelects();
+  cTrip.value=currentTripId;
+  cTrip.disabled=true;
+  openModal('costModal');
+}
+function openPaymentModalForCurrentTrip(){
+  if(!currentTripId)return;
+  fillSelects();
+  pTrip.value=currentTripId;
+  pTrip.disabled=true;
+  fillPaymentCosts(currentTripId);
+  document.getElementById('pDate').value=today();
+  openModal('paymentModal');
+}
+function openRejectedModalForCurrentTrip(){
+  if(!currentTripId)return;
+  fillSelects();
+  rTrip.value=currentTripId;
+  rTrip.disabled=true;
+  document.getElementById('rDate').value=today();
+  openModal('rejectedModal');
+}
+function openReceiptModalForCurrentTrip(){
+  if(!currentTripId)return;
+  if(!config.api){
+    alert('Primero configurá la URL de Google Apps Script en Configuración para poder guardar comprobantes en Drive.');
+    return;
+  }
+  rcDate.value=today();
+  rcDescription.value='';
+  rcRecipient.value='';
+  rcAmount.value='';
+  rcNotes.value='';
+  rcFile.value='';
+  receiptUploadStatus.textContent='El archivo se guardará en Google Drive y quedará asociado a este viaje.';
+  fillReceiptCosts();
+  openModal('receiptModal');
+}
+function fillReceiptCosts(){
+  const costs=db.costs.filter(c=>c.tripId===currentTripId);
+  rcCost.innerHTML='<option value="">Sin gasto asociado</option>'+costs.map(c=>`<option value="${c.id}">${esc(c.concept)} · ${money(c.total,c.currency||'ARS')}</option>`).join('');
+}
+function receiptCostChanged(){
+  const c=db.costs.find(x=>x.id===rcCost.value);
+  if(!c)return;
+  rcCurrency.value=c.currency||'ARS';
+  const pn=providerName(c.providerId);
+  if(pn && pn!=='—') rcRecipient.value=pn;
+  if(!rcDescription.value) rcDescription.value=c.concept||'';
+}
+
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function openTripModal(){openModal('tripModal')}
+function openCostModal(){fillSelects();cTrip.disabled=false;openModal('costModal')}
+function openPaymentModal(costId=''){fillSelects();pTrip.disabled=false;document.getElementById('pDate').value=today();if(costId){const c=db.costs.find(x=>x.id===costId);if(c){pTrip.value=c.tripId;fillPaymentCosts(c.tripId);pCost.value=c.id;syncPaymentCost();}}else{fillPaymentCosts(pTrip.value)}openModal('paymentModal')}
+function openProviderModal(){openModal('providerModal')}
+function openRejectedModal(){fillSelects();rTrip.disabled=false;document.getElementById('rDate').value=today();openModal('rejectedModal')}
+
+function saveTrip(e){e.preventDefault();db.trips.push({id:uid(),name:tName.value,destination:tDestination.value,start:tStart.value,end:tEnd.value,passengers:+tPassengers.value,responsible:tResponsible.value,notes:tNotes.value,created:new Date().toISOString()});persist();e.target.reset();closeModal('tripModal')}
+function saveCost(e){e.preventDefault();cTrip.disabled=false;db.costs.push({id:uid(),tripId:cTrip.value,category:cCategory.value,concept:cConcept.value,providerId:cProvider.value,currency:cCurrency.value,qty:1,unit:+cTotal.value,total:+cTotal.value,notes:cNotes.value,created:new Date().toISOString()});persist();e.target.reset();closeModal('costModal');if(currentTripId)renderTripDetail()}
+function savePayment(e){
+  e.preventDefault();
+  const cost=db.costs.find(x=>x.id===pCost.value);
+  if(!cost)return alert('Seleccioná la cuenta o gasto que estás pagando.');
+  const amount=+pAmount.value;
+  const pending=costPending(cost.id);
+  if(amount<=0)return alert('Ingresá un monto válido.');
+  if(amount>pending+0.001)return alert('El pago supera el saldo pendiente de '+money(pending)+'.');
+  pTrip.disabled=false;db.payments.push({id:uid(),tripId:pTrip.value,costId:pCost.value,date:pDate.value,providerId:pProvider.value,concept:pConcept.value,method:pMethod.value,currency:cost.currency||'ARS',amount,receipt:pReceipt.value,notes:pNotes.value,created:new Date().toISOString()});
+  persist();e.target.reset();closeModal('paymentModal');if(currentTripId)renderTripDetail();
+}
+
+async function fileToUploadPayload(file){
+  if(!file.type.startsWith('image/')){
+    const dataUrl=await readFileAsDataURL(file);
+    return {base64:dataUrl.split(',')[1],mimeType:file.type||'application/octet-stream',fileName:file.name};
+  }
+  const dataUrl=await readFileAsDataURL(file);
+  const img=await loadImage(dataUrl);
+  const maxSide=1800;
+  const scale=Math.min(1,maxSide/Math.max(img.width,img.height));
+  const w=Math.max(1,Math.round(img.width*scale)), h=Math.max(1,Math.round(img.height*scale));
+  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+  const out=canvas.toDataURL('image/jpeg',0.86);
+  const base=(file.name||'comprobante').replace(/\.[^.]+$/,'');
+  return {base64:out.split(',')[1],mimeType:'image/jpeg',fileName:base+'.jpg'};
+}
+function readFileAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=()=>reject(fr.error||new Error('No se pudo leer el archivo')); fr.readAsDataURL(file);
+  });
+}
+function loadImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(); img.onload=()=>resolve(img); img.onerror=()=>reject(new Error('No se pudo procesar la imagen')); img.src=src;
+  });
+}
+async function uploadReceipt(e){
+  e.preventDefault();
+  if(!currentTripId)return alert('No hay un viaje seleccionado.');
+  if(!config.api)return alert('Configurá Google Apps Script antes de subir comprobantes.');
+  const file=rcFile.files && rcFile.files[0];
+  if(!file)return alert('Seleccioná una imagen o PDF.');
+  if(file.size>15*1024*1024)return alert('El archivo es demasiado grande. Usá un archivo menor a 15 MB.');
+
+  const t=db.trips.find(x=>x.id===currentTripId);
+  if(!t)return;
+  const localId=uid();
+  receiptSubmit.disabled=true;
+  receiptUploadStatus.textContent='Preparando y subiendo comprobante a Google Drive...';
+
+  try{
+    const fp=await fileToUploadPayload(file);
+    const metadata={
+      id:localId,tripId:currentTripId,tripName:t.name,date:rcDate.value,costId:rcCost.value,
+      description:rcDescription.value.trim(),recipient:rcRecipient.value.trim(),currency:rcCurrency.value,
+      amount:+rcAmount.value,notes:rcNotes.value.trim()
+    };
+    const res=await fetch(config.api,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'uploadReceipt',metadata,fileBase64:fp.base64,mimeType:fp.mimeType,fileName:fp.fileName})
+    });
+    const out=await res.json();
+    if(!out.ok)throw new Error(out.error||'No se pudo subir el comprobante.');
+    db.receipts.push({...metadata,fileId:out.fileId,fileUrl:out.fileUrl,fileName:out.fileName||fp.fileName,folderUrl:out.folderUrl||'',uploadedAt:new Date().toISOString()});
+    persist();
+    receiptUploadStatus.textContent='Comprobante guardado correctamente en Google Drive.';
+    e.target.reset();
+    closeModal('receiptModal');
+    renderTripDetail();
+  }catch(err){
+    console.error(err);
+    receiptUploadStatus.textContent='Error: '+(err.message||'No se pudo subir el comprobante.');
+    alert('No se pudo guardar el comprobante en Drive. '+(err.message||''));
+  }finally{
+    receiptSubmit.disabled=false;
+  }
+}
+async function deleteReceipt(id){
+  const r=db.receipts.find(x=>x.id===id); if(!r)return;
+  if(!confirm('¿Eliminar este comprobante del registro y enviarlo a la papelera de Google Drive?'))return;
+  try{
+    if(config.api && r.fileId){
+      const res=await fetch(config.api,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'deleteReceipt',fileId:r.fileId})});
+      const out=await res.json();
+      if(!out.ok)throw new Error(out.error||'No se pudo eliminar el archivo de Drive.');
+    }
+    db.receipts=db.receipts.filter(x=>x.id!==id);
+    persist();
+  }catch(err){
+    alert('No se eliminó el comprobante: '+(err.message||'error desconocido'));
+  }
+}
+
+function saveProvider(e){e.preventDefault();db.providers.push({id:uid(),name:prName.value,type:prType.value,phone:prPhone.value,tax:prTax.value,notes:prNotes.value});persist();e.target.reset();closeModal('providerModal')}
+function saveRejected(e){
+  e.preventDefault();
+  rTrip.disabled=false;
+  db.rejectedDollars.push({
+    id:uid(),date:rDate.value,passenger:rPassenger.value.trim(),tripId:rTrip.value,
+    amount:+rAmount.value,reason:rReason.value.trim(),status:rStatus.value,notes:rNotes.value.trim(),
+    created:new Date().toISOString()
+  });
+  persist();e.target.reset();closeModal('rejectedModal');if(currentTripId)renderTripDetail();
+}
+function updateRejectedStatus(id,status){
+  const r=db.rejectedDollars.find(x=>x.id===id);if(!r)return;
+  r.status=status;persist();
+}
+
+function removeItem(kind,id){
+  if(!confirm('¿Eliminar este registro?')) return;
+  db[kind]=db[kind].filter(x=>x.id!==id);persist();if(currentTripId)renderTripDetail();
+}
+function tripCost(id,currency='ARS'){return db.costs.filter(x=>x.tripId===id&&(x.currency||'ARS')===currency).reduce((a,b)=>a+Number(b.total||0),0)}
+function tripPaid(id,currency='ARS'){return db.payments.filter(x=>x.tripId===id&&(x.currency||'ARS')===currency).reduce((a,b)=>a+Number(b.amount||0),0)}
+function tripPending(id,currency='ARS'){return Math.max(0,tripCost(id,currency)-tripPaid(id,currency))}
+function costPaid(id){return db.payments.filter(x=>x.costId===id).reduce((a,b)=>a+Number(b.amount||0),0)}
+function costPending(id){const c=db.costs.find(x=>x.id===id);return c?Math.max(0,Number(c.total||0)-costPaid(id)):0}
+function costStatus(id){
+  const c=db.costs.find(x=>x.id===id); if(!c)return ['—','b-red'];
+  const total=Number(c.total||0), paid=costPaid(id);
+  if(total>0 && paid>=total-0.001)return ['Pagado','b-green'];
+  if(paid>0)return ['Parcial','b-yellow'];
+  return ['Pendiente','b-red'];
+}
+function payStatus(id){
+  const costARS=tripCost(id,'ARS'), paidARS=tripPaid(id,'ARS');
+  const costUSD=tripCost(id,'USD'), paidUSD=tripPaid(id,'USD');
+  const hasCost=(costARS+costUSD)>0, anyPaid=(paidARS+paidUSD)>0;
+  const complete=(costARS===0||paidARS>=costARS-0.001)&&(costUSD===0||paidUSD>=costUSD-0.001);
+  if(hasCost && complete) return ['Pagado','b-green'];
+  if(anyPaid) return ['Parcial','b-yellow'];
+  return ['Sin pagos','b-red'];
+}
+function providerName(id){return db.providers.find(x=>x.id===id)?.name || '—'}
+function tripName(id){return db.trips.find(x=>x.id===id)?.name || '—'}
+
+
+function renderTripDetail(){
+  if(!currentTripId)return;
+  const t=db.trips.find(x=>x.id===currentTripId); if(!t){goToTrips();return}
+  detailTripTitle.textContent=t.name;
+  detailTripMeta.textContent=`${t.destination} · ${fmtDate(t.start)} al ${fmtDate(t.end)} · ${t.passengers} pasajeros${t.responsible?` · Responsable: ${t.responsible}`:''}`;
+  dtCostARS.textContent=moneyARS(tripCost(t.id,'ARS'));
+  dtPaidARS.textContent=moneyARS(tripPaid(t.id,'ARS'));
+  dtCostUSD.textContent=moneyUSD(tripCost(t.id,'USD'));
+  dtPaidUSD.textContent=moneyUSD(tripPaid(t.id,'USD'));
+  dtPendingARS.textContent=moneyARS(tripPending(t.id,'ARS'));
+  dtPendingUSD.textContent=moneyUSD(tripPending(t.id,'USD'));
+  dtPassengers.textContent=t.passengers||0;
+  dtRejectedUSD.textContent=moneyUSD((db.rejectedDollars||[]).filter(r=>r.tripId===t.id).reduce((a,b)=>a+Number(b.amount||0),0));
+
+  const costs=db.costs.filter(c=>c.tripId===t.id);
+  detailCostsTable.innerHTML=costs.length?costs.map(c=>{
+    const s=costStatus(c.id);
+    return `<tr>
+      <td><span class="badge b-blue">${esc(c.category)}</span></td>
+      <td>${esc(c.concept)}</td>
+      <td>${esc(providerName(c.providerId))}</td>
+      <td>${c.currency||'ARS'}</td>
+      <td><strong>${money(c.total,c.currency||'ARS')}</strong></td>
+      <td>${money(costPaid(c.id),c.currency||'ARS')}</td>
+      <td><strong>${money(costPending(c.id),c.currency||'ARS')}</strong></td>
+      <td><span class="badge ${s[1]}">${s[0]}</span></td>
+      <td><div class="actions"><button class="btn btn-success" onclick="openPaymentModal('${c.id}')">+ Pago</button><button class="btn btn-danger" onclick="removeItem('costs','${c.id}')">Eliminar</button></div></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9" class="empty">Todavía no cargaste costos para este viaje.</td></tr>`;
+
+  const pays=db.payments.filter(p=>p.tripId===t.id);
+  detailPaymentsTable.innerHTML=pays.length?pays.map(p=>{
+    const c=db.costs.find(x=>x.id===p.costId);
+    return `<tr>
+      <td>${fmtDate(p.date)}</td>
+      <td>${esc(c?c.concept:'—')}</td>
+      <td>${esc(providerName(p.providerId))}</td>
+      <td>${esc(p.concept)}</td>
+      <td>${esc(p.method)}</td>
+      <td>${p.currency||'ARS'}</td>
+      <td><strong>${money(p.amount,p.currency||'ARS')}</strong></td>
+      <td><button class="btn btn-danger" onclick="removeItem('payments','${p.id}')">Eliminar</button></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="8" class="empty">Todavía no hay pagos registrados para este viaje.</td></tr>`;
+
+
+  const receipts=(db.receipts||[]).filter(r=>r.tripId===t.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  detailReceiptsTable.innerHTML=receipts.length?receipts.map(r=>{
+    const c=db.costs.find(x=>x.id===r.costId);
+    return `<tr>
+      <td>${fmtDate(r.date)}</td>
+      <td>${esc(c?c.concept:'—')}</td>
+      <td>${esc(r.description)}</td>
+      <td>${esc(r.recipient)}</td>
+      <td>${r.currency||'ARS'}</td>
+      <td><strong>${money(r.amount,r.currency||'ARS')}</strong></td>
+      <td>${r.fileUrl?`<a class="btn btn-light" href="${esc(r.fileUrl)}" target="_blank" rel="noopener">Ver en Drive</a>`:'—'}</td>
+      <td><button class="btn btn-danger" type="button" onclick="deleteReceipt('${r.id}')">Eliminar</button></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="8" class="empty">Todavía no hay comprobantes cargados para este viaje.</td></tr>`;
+
+  const rej=(db.rejectedDollars||[]).filter(r=>r.tripId===t.id);
+  detailRejectedTable.innerHTML=rej.length?rej.map(r=>`
+    <tr>
+      <td>${fmtDate(r.date)}</td>
+      <td>${esc(r.passenger)}</td>
+      <td><strong>${moneyUSD(r.amount)}</strong></td>
+      <td>${esc(r.reason)}</td>
+      <td>${esc(r.status)}</td>
+      <td><button class="btn btn-danger" onclick="removeItem('rejectedDollars','${r.id}')">Eliminar</button></td>
+    </tr>`).join(''):`<tr><td colspan="6" class="empty">No hay dólares rechazados vinculados a este viaje.</td></tr>`;
+}
+
+function renderStats(){
+  const costsARS=db.costs.filter(x=>(x.currency||'ARS')==='ARS').reduce((a,b)=>a+Number(b.total||0),0);
+  const paidARS=db.payments.filter(x=>(x.currency||'ARS')==='ARS').reduce((a,b)=>a+Number(b.amount||0),0);
+  const costsUSD=db.costs.filter(x=>x.currency==='USD').reduce((a,b)=>a+Number(b.total||0),0);
+  const paidUSD=db.payments.filter(x=>x.currency==='USD').reduce((a,b)=>a+Number(b.amount||0),0);
+  stTrips.textContent=db.trips.length;
+  stCosts.innerHTML=`${moneyARS(costsARS)}<div class="small muted">${moneyUSD(costsUSD)}</div>`;
+  stPaid.innerHTML=`${moneyARS(paidARS)}<div class="small muted">${moneyUSD(paidUSD)}</div>`;
+  stPending.innerHTML=`${moneyARS(Math.max(0,costsARS-paidARS))}<div class="small muted">${moneyUSD(Math.max(0,costsUSD-paidUSD))}</div>`;
+  const rejected=(db.rejectedDollars||[]).reduce((a,b)=>a+Number(b.amount||0),0);
+  const rejectedPending=(db.rejectedDollars||[]).filter(r=>r.status==='Pendiente').reduce((a,b)=>a+Number(b.amount||0),0);
+  if(document.getElementById('stRejectedUSD')) stRejectedUSD.textContent=moneyUSD(rejected);
+  if(document.getElementById('stRejectedPendingUSD')) stRejectedPendingUSD.textContent=moneyUSD(rejectedPending);
+}
+function renderRecent(){
+  const rows=[...db.trips].sort((a,b)=>new Date(b.created)-new Date(a.created)).slice(0,5);
+  recentTrips.innerHTML=rows.length?rows.map(t=>{const s=payStatus(t.id);return `<tr><td><button type="button" class="btn btn-light" onclick="openTripDetail('${t.id}')" style="padding:7px 10px"><strong>${esc(t.name)}</strong></button><div class="small muted">${esc(t.destination)}</div></td><td>${fmtDate(t.start)} - ${fmtDate(t.end)}</td><td>${t.passengers}</td><td>${moneyARS(tripCost(t.id,'ARS'))}<div class="small muted">${moneyUSD(tripCost(t.id,'USD'))}</div></td><td>${moneyARS(tripPaid(t.id,'ARS'))}<div class="small muted">${moneyUSD(tripPaid(t.id,'USD'))}</div></td><td><span class="badge ${s[1]}">${s[0]}</span></td></tr>`}).join(''):`<tr><td colspan="6" class="empty">Todavía no hay viajes cargados.</td></tr>`;
+}
+function renderTrips(){
+  const q=(tripSearch?.value||'').toLowerCase();
+  const rows=db.trips.filter(t=>(t.name+' '+t.destination).toLowerCase().includes(q));
+  tripsTable.innerHTML=rows.length?rows.map(t=>`<tr><td><strong>${esc(t.name)}</strong></td><td>${esc(t.destination)}</td><td>${fmtDate(t.start)}</td><td>${t.passengers}</td><td>${moneyARS(tripCost(t.id,'ARS'))}<div class="small muted">${moneyUSD(tripCost(t.id,'USD'))}</div></td><td>${moneyARS(tripPaid(t.id,'ARS'))}<div class="small muted">${moneyUSD(tripPaid(t.id,'USD'))}</div></td><td>${moneyARS(tripPending(t.id,'ARS'))}<div class="small muted">${moneyUSD(tripPending(t.id,'USD'))}</div></td><td><div class="actions"><button class="btn btn-primary" onclick="openTripDetail('${t.id}')">Ingresar</button><button class="btn btn-danger" onclick="removeItem('trips','${t.id}')">Eliminar</button></div></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No hay viajes.</td></tr>`;
+}
+function renderCosts(){
+  costsTable.innerHTML=db.costs.length?db.costs.map(c=>{
+    const s=costStatus(c.id);
+    return `<tr>
+      <td>${esc(tripName(c.tripId))}</td>
+      <td><span class="badge b-blue">${esc(c.category)}</span></td>
+      <td>${esc(c.concept)}</td>
+      <td>${esc(providerName(c.providerId))}</td>
+      <td><strong>${money(c.total,c.currency||'ARS')}</strong></td>
+      <td>${money(costPaid(c.id),c.currency||'ARS')}</td>
+      <td><strong>${money(costPending(c.id),c.currency||'ARS')}</strong></td>
+      <td><span class="badge ${s[1]}">${s[0]}</span></td>
+      <td><div class="actions"><button class="btn btn-success" onclick="openPaymentModal('${c.id}')">+ Pago</button><button class="btn btn-danger" onclick="removeItem('costs','${c.id}')">Eliminar</button></div></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9" class="empty">No hay costos cargados.</td></tr>`;
+}
+function renderPayments(){
+  paymentsTable.innerHTML=db.payments.length?db.payments.map(p=>{
+    const c=db.costs.find(x=>x.id===p.costId);
+    return `<tr><td>${fmtDate(p.date)}</td><td>${esc(tripName(p.tripId))}</td><td>${esc(providerName(p.providerId))}</td><td>${esc(p.concept)}${c?`<div class="small muted">Cuenta: ${esc(c.concept)}</div>`:''}</td><td><span class="badge ${p.method==='Transferencia'?'b-blue':'b-yellow'}">${p.method}</span></td><td><strong>${money(p.amount,p.currency||'ARS')}</strong></td><td>${esc(p.receipt||'—')}</td><td><button class="btn btn-danger" onclick="removeItem('payments','${p.id}')">Eliminar</button></td></tr>`;
+  }).join(''):`<tr><td colspan="8" class="empty">No hay pagos registrados.</td></tr>`;
+}
+
+function renderRejected(){
+  const rows=[...(db.rejectedDollars||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  rejectedTable.innerHTML=rows.length?rows.map(r=>{
+    const cls=r.status==='Pendiente'?'b-red':(r.status==='Reemplazado'||r.status==='Resuelto'?'b-green':'b-yellow');
+    return `<tr>
+      <td>${fmtDate(r.date)}</td>
+      <td><strong>${esc(r.passenger)}</strong></td>
+      <td>${esc(r.tripId?tripName(r.tripId):'—')}</td>
+      <td><strong>${moneyUSD(r.amount)}</strong></td>
+      <td>${esc(r.reason)}</td>
+      <td>
+        <select onchange="updateRejectedStatus('${r.id}',this.value)" style="min-width:130px">
+          ${['Pendiente','Reemplazado','Devuelto','Resuelto'].map(s=>`<option ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>${esc(r.notes||'—')}</td>
+      <td><button class="btn btn-danger" onclick="removeItem('rejectedDollars','${r.id}')">Eliminar</button></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="8" class="empty">No hay dólares rechazados registrados.</td></tr>`;
+}
+
+function renderProviders(){
+  providersTable.innerHTML=db.providers.length?db.providers.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.type)}</td><td>${esc(p.phone||'—')}</td><td>${esc(p.tax||'—')}</td><td>${esc(p.notes||'—')}</td><td><button class="btn btn-danger" onclick="removeItem('providers','${p.id}')">Eliminar</button></td></tr>`).join(''):`<tr><td colspan="6" class="empty">No hay proveedores registrados.</td></tr>`;
+}
+function fillSelects(){
+  const tripOpts='<option value="">Seleccionar...</option>'+db.trips.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const provOpts='<option value="">Sin asignar</option>'+db.providers.map(p=>`<option value="${p.id}">${esc(p.name)} · ${esc(p.type)}</option>`).join('');
+  ['cTrip','pTrip','reportTrip','rTrip'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=tripOpts;});
+  ['cProvider','pProvider'].forEach(id=>document.getElementById(id).innerHTML=provOpts);
+}
+function fillPaymentCosts(tripId){
+  const costs=db.costs.filter(c=>c.tripId===tripId);
+  pCost.innerHTML='<option value="">Seleccionar cuenta...</option>'+costs.map(c=>`<option value="${c.id}">${esc(c.concept)} · ${money(c.total,c.currency||'ARS')} · pendiente ${money(costPending(c.id),c.currency||'ARS')}</option>`).join('');
+}
+function syncPaymentCost(){
+  const c=db.costs.find(x=>x.id===pCost.value);
+  if(!c){paymentBalanceNotice.textContent='Seleccioná una cuenta para ver cuánto queda pendiente.';return}
+  pProvider.value=c.providerId||'';
+  pCurrency.value=c.currency||'ARS';
+  paymentBalanceNotice.innerHTML=`Moneda: <strong>${c.currency==='USD'?'Dólares (USD)':'Pesos (ARS)'}</strong> · Monto previsto: <strong>${money(c.total,c.currency||'ARS')}</strong> · Pagado: <strong>${money(costPaid(c.id),c.currency||'ARS')}</strong> · Pendiente: <strong>${money(costPending(c.id),c.currency||'ARS')}</strong>`;
+  pAmount.max=costPending(c.id);
+}
+pTrip.addEventListener('change',()=>{fillPaymentCosts(pTrip.value);syncPaymentCost()});
+pCost.addEventListener('change',syncPaymentCost);
+function renderReportSummary(){
+  const id=reportTrip.value,t=db.trips.find(x=>x.id===id);
+  if(!t){reportSummary.innerHTML='<h4>Resumen del viaje</h4><div style="color:#d1fae5">Seleccioná un viaje.</div>';return}
+  const costARS=tripCost(id,'ARS'),paidARS=tripPaid(id,'ARS'),pendingARS=tripPending(id,'ARS');
+  const costUSD=tripCost(id,'USD'),paidUSD=tripPaid(id,'USD'),pendingUSD=tripPending(id,'USD');
+  const transferARS=db.payments.filter(x=>x.tripId===id&&x.method==='Transferencia'&&(x.currency||'ARS')==='ARS').reduce((a,b)=>a+b.amount,0);
+  const cashARS=db.payments.filter(x=>x.tripId===id&&x.method==='Efectivo'&&(x.currency||'ARS')==='ARS').reduce((a,b)=>a+b.amount,0);
+  const transferUSD=db.payments.filter(x=>x.tripId===id&&x.method==='Transferencia'&&x.currency==='USD').reduce((a,b)=>a+b.amount,0);
+  const cashUSD=db.payments.filter(x=>x.tripId===id&&x.method==='Efectivo'&&x.currency==='USD').reduce((a,b)=>a+b.amount,0);
+  const rejectedUSD=(db.rejectedDollars||[]).filter(x=>x.tripId===id).reduce((a,b)=>a+Number(b.amount||0),0);
+  reportSummary.innerHTML=`<h4>${esc(t.name)}</h4>
+  <div class="sum-row"><span>Costo total ARS</span><strong>${moneyARS(costARS)}</strong></div>
+  <div class="sum-row"><span>Pagado ARS</span><strong>${moneyARS(paidARS)}</strong></div>
+  <div class="sum-row"><span>Pendiente ARS</span><strong>${moneyARS(pendingARS)}</strong></div>
+  <hr style="border:0;border-top:1px solid rgba(255,255,255,.25)">
+  <div class="sum-row"><span>Costo total USD</span><strong>${moneyUSD(costUSD)}</strong></div>
+  <div class="sum-row"><span>Pagado USD</span><strong>${moneyUSD(paidUSD)}</strong></div>
+  <div class="sum-row"><span>Pendiente USD</span><strong>${moneyUSD(pendingUSD)}</strong></div>
+  <hr style="border:0;border-top:1px solid rgba(255,255,255,.25)">
+  <div class="sum-row"><span>Transferencias ARS</span><span>${moneyARS(transferARS)}</span></div>
+  <div class="sum-row"><span>Efectivo ARS</span><span>${moneyARS(cashARS)}</span></div>
+  <div class="sum-row"><span>Transferencias USD</span><span>${moneyUSD(transferUSD)}</span></div>
+  <div class="sum-row"><span>Efectivo USD</span><span>${moneyUSD(cashUSD)}</span></div>
+  <div class="sum-row"><span>Dólares rechazados</span><strong>${moneyUSD(rejectedUSD)}</strong></div>
+  <hr style="border:0;border-top:1px solid rgba(255,255,255,.25)">
+  <div class="sum-row"><span>Costo/pasajero ARS</span><strong>${moneyARS(t.passengers?costARS/t.passengers:0)}</strong></div>
+  <div class="sum-row"><span>Costo/pasajero USD</span><strong>${moneyUSD(t.passengers?costUSD/t.passengers:0)}</strong></div>`;
+}
+function fmtDate(s){if(!s)return'—';const [y,m,d]=s.split('-');return `${d}/${m}/${y}`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+
+function exportPDF(){
+  const id=reportTrip.value,t=db.trips.find(x=>x.id===id);if(!t)return alert('Seleccioná un viaje.');
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  doc.setFontSize(18);doc.text(config.company||'Donner Turismo',14,18);
+  doc.setFontSize(13);doc.text('Resumen económico del viaje',14,27);
+  doc.setFontSize(10);doc.text(`Viaje: ${t.name}`,14,36);doc.text(`Destino: ${t.destination}`,14,42);doc.text(`Fechas: ${fmtDate(t.start)} al ${fmtDate(t.end)} · Pasajeros: ${t.passengers}`,14,48);
+  const costs=db.costs.filter(x=>x.tripId===id).map(c=>[c.category,c.concept,providerName(c.providerId),c.currency||'ARS',money(c.total,c.currency||'ARS'),money(costPaid(c.id),c.currency||'ARS'),money(costPending(c.id),c.currency||'ARS')]);
+  doc.autoTable({startY:56,head:[['Categoría','Concepto','Proveedor','Moneda','Monto previsto','Pagado','Pendiente']],body:costs,styles:{fontSize:8}});
+  let y=doc.lastAutoTable.finalY+8;
+  const pays=db.payments.filter(x=>x.tripId===id).map(p=>[fmtDate(p.date),providerName(p.providerId),p.concept,p.method,p.currency||'ARS',money(p.amount,p.currency||'ARS'),p.receipt||'']);
+  doc.autoTable({startY:y,head:[['Fecha','Destinatario','Concepto','Medio','Moneda','Monto','Comprobante']],body:pays,styles:{fontSize:8}});
+  y=doc.lastAutoTable.finalY+10;doc.setFontSize(10);
+  doc.text(`ARS - Costo: ${moneyARS(tripCost(id,'ARS'))} | Pagado: ${moneyARS(tripPaid(id,'ARS'))} | Pendiente: ${moneyARS(tripPending(id,'ARS'))}`,14,y);
+  doc.text(`USD - Costo: ${moneyUSD(tripCost(id,'USD'))} | Pagado: ${moneyUSD(tripPaid(id,'USD'))} | Pendiente: ${moneyUSD(tripPending(id,'USD'))}`,14,y+6);
+  const rej=(db.rejectedDollars||[]).filter(r=>r.tripId===id).reduce((a,b)=>a+Number(b.amount||0),0);
+  doc.text(`Dólares rechazados vinculados al viaje: ${moneyUSD(rej)}`,14,y+12);
+  doc.save(`Donner_${t.name.replace(/\s+/g,'_')}.pdf`);
+}
+function exportExcel(){
+  const id=reportTrip.value,t=db.trips.find(x=>x.id===id);if(!t)return alert('Seleccioná un viaje.');
+  const wb=XLSX.utils.book_new();
+  const resumen=[
+    ['DONNER TURISMO - RESUMEN ECONÓMICO'],['Viaje',t.name],['Destino',t.destination],['Salida',fmtDate(t.start)],['Regreso',fmtDate(t.end)],['Pasajeros',t.passengers],
+    [],['RESUMEN EN PESOS (ARS)'],['Costo total ARS',tripCost(id,'ARS')],['Pagado ARS',tripPaid(id,'ARS')],['Pendiente ARS',tripPending(id,'ARS')],['Costo por pasajero ARS',t.passengers?tripCost(id,'ARS')/t.passengers:0],
+    [],['RESUMEN EN DÓLARES (USD)'],['Costo total USD',tripCost(id,'USD')],['Pagado USD',tripPaid(id,'USD')],['Pendiente USD',tripPending(id,'USD')],['Costo por pasajero USD',t.passengers?tripCost(id,'USD')/t.passengers:0],
+    [],['Dólares rechazados del viaje',(db.rejectedDollars||[]).filter(r=>r.tripId===id).reduce((a,b)=>a+Number(b.amount||0),0)]
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'Resumen');
+  const costs=[['Categoría','Concepto','Proveedor','Moneda','Monto previsto','Pagado','Pendiente','Estado','Observaciones'],...db.costs.filter(x=>x.tripId===id).map(c=>{const s=costStatus(c.id);return [c.category,c.concept,providerName(c.providerId),c.currency||'ARS',c.total,costPaid(c.id),costPending(c.id),s[0],c.notes||'']})];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(costs),'Costos');
+  const pays=[['Fecha','Cuenta / gasto','Destinatario','Concepto del pago','Medio','Moneda','Monto','Comprobante','Observaciones'],...db.payments.filter(x=>x.tripId===id).map(p=>{const c=db.costs.find(x=>x.id===p.costId);return [fmtDate(p.date),c?c.concept:'Pago general',providerName(p.providerId),p.concept,p.method,p.currency||'ARS',p.amount,p.receipt||'',p.notes||'']})];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pays),'Pagos');
+  const rejected=[['Fecha','Pasajero','Viaje','Monto USD','Motivo / Marca','Estado','Observaciones'],...(db.rejectedDollars||[]).filter(r=>!r.tripId||r.tripId===id).map(r=>[fmtDate(r.date),r.passenger,r.tripId?tripName(r.tripId):'',r.amount,r.reason,r.status,r.notes||''])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rejected),'Dólares rechazados');
+  XLSX.writeFile(wb,`Donner_${t.name.replace(/\s+/g,'_')}.xlsx`);
+}
+function renderAll(){renderStats();renderRecent();renderTrips();renderCosts();renderPayments();renderProviders();renderRejected();fillSelects();renderReportSummary();if(currentTripId)renderTripDetail()}
+document.getElementById('cfgCompany').value=config.company||'Donner Turismo';
+document.getElementById('cfgApi').value=config.api||DEFAULT_API_URL;
+updateSyncState();renderAll();loadRemote();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
